@@ -38,13 +38,25 @@ const Signup = ({navigation}) => {
       } else if (password.length < 6) {
         Alert.alert('Password must have at Least 6 Characters');
       } else {
-        const userCredentials = await auth()
+        await auth()
           .createUserWithEmailAndPassword(email, password)
-          .then(async user => {
+          .then(async userCredential => {
+            const user = userCredential.user;
             if (user) {
               await auth().currentUser.updateProfile({
                 displayName: `${firstName} ${lastName}`,
               });
+              try {
+                await ref.add({
+                  email: email,
+                  firstName: false,
+                  lastName: lastName,
+                  UserId: user.uid,
+                });
+                console.log('User Uploaded--------');
+              } catch (e) {
+                console.log(e, 'ERROR======');
+              }
               setFirstName('');
               setLastName('');
               setEmail('');
@@ -54,9 +66,13 @@ const Signup = ({navigation}) => {
             }
           });
       }
-    } catch (e) {
-      console.log(e);
-      Alert.alert('Error', e.message);
+    } catch (error) {
+      if (error.code === 'auth/email-already-in-use') {
+        Alert.alert('Error', 'The email address is already in use.');
+      } else {
+        console.log(error);
+        Alert.alert('Error', error);
+      }
     }
   };
   return (

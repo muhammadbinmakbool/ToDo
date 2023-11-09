@@ -11,10 +11,9 @@ import React, {useState} from 'react';
 
 const AddTask = ({navigation}) => {
   const [todo, settodo] = useState();
-
   const addtask = task => {
     settodo('');
-    navigation.navigate('TodoList', task);
+    navigation.navigate('TodoList', newTask);
   };
 
   return (

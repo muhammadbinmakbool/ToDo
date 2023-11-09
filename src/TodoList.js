@@ -9,46 +9,39 @@ import {
   ScrollView,
 } from 'react-native';
 import CheckBox from '@react-native-community/checkbox';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import firestore from '@react-native-firebase/firestore';
 import DIcon from 'react-native-vector-icons/AntDesign';
 import SOIcon from 'react-native-vector-icons/FontAwesome';
-import RIcon from 'react-native-vector-icons/Ionicons';
 import auth from '@react-native-firebase/auth';
 
 const TodoList = ({route, navigation}) => {
   const newTask = route.params;
-  const [todoList, setTodoList] = useState([]);
+  // console.log('Rerendered New Task', newTask);
   const [localTodoList, setLocalTodoList] = useState([]);
-  const [statusChange, setStatusChange] = useState(false);
   const [firstRender, setFirstRender] = useState(true);
-  const ref = firestore().collection('Tasks');
   const user = auth().currentUser;
-  const batch = firestore().batch();
-  console.log(user, '~~~~User Data~~~~');
   const userId = user.uid;
+  const ref = firestore().collection('Tasks');
+  // console.log(user, '~~~~User Data~~~~');
   const fullName = user.displayName;
   const [firstName, lastName] = fullName.split(' ');
 
   // Set Data to Firebase
-  const setDatatoFirebase = async () => {
+  const setDatatoFirebase = useCallback(async () => {
     try {
       await ref.add({
         task: newTask,
         status: false,
         UserId: user.uid,
       });
-      // .then(async () => {
-      //   const docId = docRef.id;
-      //   await ref.doc(docId).update({docId: docId});
-      // });
       console.log('Uploaded--------');
     } catch (e) {
       console.log(e, 'ERROR======');
     }
-    setStatusChange(false);
     await getDatafromFirebase();
-  };
+  }, [newTask]);
+
   // Get Data from Firebase
   const getDatafromFirebase = async () => {
     try {
@@ -57,49 +50,47 @@ const TodoList = ({route, navigation}) => {
         docId: doc.id,
         ...doc.data(),
       }));
-      setTodoList(taskList);
       setLocalTodoList(taskList);
       console.log(taskList, '==========');
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
   };
+
   // Delete Data from FireBase
   const deleteTask = async id => {
     await ref.doc(id).delete();
     const updateLocalTodoList = localTodoList.filter(task => task.docId !== id);
     setLocalTodoList(updateLocalTodoList);
   };
-  // Update Data in the Firebase
-  const updateDataInFirebase = async () => {
-    const tasksToUpdate = localTodoList.filter(
-      (task, index) => task.status !== todoList[index].status,
-    );
-    if (tasksToUpdate.length > 0) {
-      tasksToUpdate.forEach(task => {
-        const taskRef = ref.doc(task.docId).update({status: task.status});
-        // batch.update(taskRef, {status: task.status});
-        console.log(taskRef, 'Doc ID--------');
-      });
-    }
-    try {
-      // await batch.commit();
-      setTodoList(localTodoList);
-      setStatusChange(false);
-      console.log('Committed');
-    } catch (error) {
-      console.error('Error updating data in Firebase:', error);
-    }
-  };
+
   // CheckBox Value Handler
   const toggleHandler = item => {
     const updateTodoList = [...localTodoList];
     const index = localTodoList.findIndex(task => task.task === item.task);
     updateTodoList[index].status = !localTodoList[index].status;
     setLocalTodoList(updateTodoList);
-    setStatusChange(true);
+
     console.log(localTodoList[index].status, 'Status Changed');
+    updateDataInFirebase(item);
   };
+
+  // Update Data in the Firebase
+  const updateDataInFirebase = async item => {
+    const updatedStatus = item.status;
+    try {
+      await ref.doc(item.docId).update({
+        task: item.task,
+        status: updatedStatus,
+        UserId: item.UserId,
+      });
+      console.log('Status Updated in Firebase');
+    } catch (error) {
+      console.error('Error updating data in Firebase:', error);
+    }
+    console.log('DOC ID========>', item.docId);
+  };
+
   // Sign out Button
   const signOutHandler = async () => {
     console.log('Pressed');
@@ -107,11 +98,9 @@ const TodoList = ({route, navigation}) => {
   };
 
   useEffect(() => {
-    console.log(newTask, '^^^New Task^^^');
     if (!firstRender) {
       setDatatoFirebase();
     } else {
-      // const user = auth().currentUser;
       getDatafromFirebase();
       setFirstRender(false);
     }
@@ -147,13 +136,6 @@ const TodoList = ({route, navigation}) => {
         <View style={styles.todoTaskTitleView}>
           <Text style={styles.todoTaskTitle}>Todo Tasks.</Text>
           <View style={{flexDirection: 'row'}}>
-            {statusChange && (
-              <TouchableOpacity
-                onPress={updateDataInFirebase}
-                style={{marginRight: 15}}>
-                <RIcon name="reload-circle-outline" color="#55847A" size={30} />
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               onPress={() => navigation.navigate('AddTask')}
               style={styles.addTaskButton}>
